@@ -1,0 +1,44 @@
+#!/bin/bash
+# postinst script for LuckyClick
+
+set -e
+
+case "$1" in
+    configure)
+        # Add user to 'input' group for uinput access
+        if getent group input > /dev/null 2>&1; then
+            if [ -n "$DPKG_MAINTSCRIPT_PACKAGE" ]; then
+                # Get the real user who installed the package
+                for user in $(who | awk '{print $1}' | sort -u); do
+                    if groups "$user" | grep -qv '\binput\b'; then
+                        adduser "$user" input 2>/dev/null || true
+                    fi
+                done
+            fi
+        fi
+        
+        # Load uinput kernel module if not loaded
+        if ! lsmod | grep -q '^uinput'; then
+            modprobe uinput 2>/dev/null || true
+        fi
+        
+        # Ensure uinput module loads at boot
+        if [ -f /etc/modules ]; then
+            if ! grep -q '^uinput' /etc/modules 2>/dev/null; then
+                echo 'uinput' >> /etc/modules
+            fi
+        fi
+        
+        # Update icon cache
+        if which gtk-update-icon-cache > /dev/null 2>&1; then
+            gtk-update-icon-cache /usr/share/icons/hicolor 2>/dev/null || true
+        fi
+        
+        # Update desktop database
+        if which update-desktop-database > /dev/null 2>&1; then
+            update-desktop-database 2>/dev/null || true
+        fi
+        ;;
+esac
+
+exit 0

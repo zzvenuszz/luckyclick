@@ -1,0 +1,2 @@
+[console_scripts]
+luckyclick = luckyclick.main:main

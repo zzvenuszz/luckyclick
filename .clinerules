@@ -1,0 +1,135 @@
+# CLINE RULES
+
+## General Rules
+* Luôn trả lời bằng tiếng Việt.
+* Không được đoán mò.
+* Không được sửa mã theo kiểu thử sai ngẫu nhiên.
+* Luôn phân tích nguyên nhân gốc rễ trước khi sửa.
+* Luôn giải thích lý do của phương án được chọn.
+
+---
+
+## Plan Mode Strict Rule (Quy định nghiêm ngặt Plan Mode)
+**TUYỆT ĐỐI CẤM** mọi hành động thay đổi trạng thái hệ thống trong Plan Mode, bao gồm nhưng không giới hạn:
+- Chỉnh sửa, ghi đè, xóa, tạo file (`edit`, `write`, `mv`, `rm`, v.v.)
+- Chạy lệnh build, test, deploy (`mvn`, `npm`, `docker`, v.v.)
+- Tạo artifact, file mới, log mới
+- Thay đổi cấu hình hệ thống
+
+**NGAY CẢ KHI NGƯỜI DÙNG ĐỒNG Ý** với thay đổi, Cline vẫn BẮT BUỘC phải yêu cầu người dùng chuyển sang **Act Mode** trước khi thực hiện bất kỳ thay đổi nào.
+
+Chỉ được phép trong Plan Mode: đọc file, tìm kiếm code, phân tích nguyên nhân, hỏi người dùng, và đề xuất phương án.
+
+### Xác nhận chế độ hoạt động
+Mỗi khi người dùng yêu cầu lập kế hoạch hoặc phân tích, Cline bắt buộc phải xác nhận chế độ đang hoạt động bằng dòng:
+`[PLAN MODE] Tôi hiện đang ở chế độ lập kế hoạch và sẽ không chỉnh sửa gì cho đến khi bạn phê duyệt.`
+
+### Yêu cầu tối thiểu trước khi đề xuất sửa
+Trước khi đề xuất bất kỳ thay đổi nào, Cline phải cung cấp đủ các phần sau:
+
+#### Root Cause Analysis (Phân tích nguyên nhân gốc rễ)
+- Nguyên nhân lỗi chi tiết.
+- File liên quan.
+- Thành phần liên quan.
+
+#### Proposed Solution (Giải pháp đề xuất)
+- Các phương án khả thi.
+- Ưu nhược điểm của từng phương án.
+- Phương án được chọn và lý do chọn.
+
+#### Impact Assessment (Đánh giá mức độ ảnh hưởng)
+- File sẽ thay đổi.
+- Module bị ảnh hưởng.
+- Hành vi của hệ thống có thể thay đổi như thế nào.
+
+---
+
+## Act Mode (Chế độ hành động)
+* Nghiêm cấm tự ý clone từ remote repo về local kể cả khi ở trong ACT MODE. cần xác nhận với người dùng và lên phương án backup truóc 
+### Code Changes (Chỉnh sửa mã nguồn)
+* Chỉ sửa file cần thiết đã được duyệt ở Plan Mode.
+* Không thay đổi hành vi không liên quan.
+* Không thêm giải pháp tình thế (workaround) tạm thời nếu có giải pháp chính thức.
+* Giữ nguyên phong cách viết code (coding style) hiện có của dự án.
+* Nếu file quá lớn (max char lớn hơn 5900) thì chia nhỏ các file ra thành nhiều file.
+
+## Artifact Verification (Xác minh kết quả đầu ra)
+Sau khi chạy lệnh build thành công, bắt buộc phải chạy các lệnh sau để kiểm tra file sản phẩm cuối cùng (file .deb):
+```bash
+ls -lh
+```
+```bash
+sha256sum 
+```
+```bash
+date -u "+%Y-%m-%d %H:%M:%S UTC"
+```
+
+## Strict Validation (Xác minh nghiêm ngặt)
+Cline không được phép sử dụng các cụm từ mơ hồ như: "Đã sửa xong", "Có vẻ đã sửa được", "Nên hoạt động", "Có thể build được"... trừ khi đã nhìn thấy kết quả thành công thực tế xuất hiện từ lệnh terminal `timeout 15m mvn clean package` hoặc `timeout 15m mvn clean install` trong phiên làm việc hiện tại.
+
+---
+
+## Anti-Hang Rules (Chống treo lệnh)
+Mọi lệnh chạy trên Terminal bắt buộc phải giới hạn thời gian (timeout).
+* nếu có lỗi nào liên quan đến permision thì chạy lệnh sau để fix permission rồi thử lại: sudo chown -R ubuntu:ubuntu ~/projects/vnminehardcore
+* lệnh Build tạo file được phép chạy tối đa 15 phút. 
+* Lệnh chạy thử nghiệm (test) chạy tối đa 10 phút. 
+* Cấm chạy các lệnh vô thời hạn: các lệnh khởi chạy server trực tiếp, lệnh theo dõi log liên tục có đuôi `-f` (như `tail -f`, `docker logs -f`), các trình chỉnh sửa văn bản giao diện terminal (`vim`, `nano`), hoặc các lệnh giám sát hệ thống (`top`, `htop`). Nếu cần xem log chỉ dùng lệnh xem số dòng cố định (Ví dụ: `tail -n 200 logfile.log`).
+
+---
+
+## Agent Recovery Rules (Tự phục hồi khi mất phản hồi)
+* Nếu ký tự chờ lệnh (shell prompt) đã xuất hiện trở lại trên terminal, xem như lệnh đó đã hoàn thành, không được tiếp tục ngồi chờ output.
+* Nếu lệnh không có dữ liệu mới xuất hiện trong 30 giây, phải dừng chờ, phân tích trạng thái hiện tại và đề xuất bước đi tiếp theo.
+
+---
+
+## Ngôn ngữ đơn giản
+* Không dùng các thuật ngữ quá chuyên môn và khó hiểu đối với người dùng phổ thông như: buildartifact, runner, artifact...
+* Thay vì dùng từ "artifact", hãy gọi là "file sản phẩm đầu ra" hoặc "file thành phẩm".
+* Nếu bắt buộc phải dùng thuật ngữ chuyên môn, phải giải thích ngắn gọn, trực diện và dễ hiểu ngay bên cạnh.
+
+---
+
+## README Update Rule (Quy định cập nhật README)
+**BẮT BUỘC**: Khi thêm chức năng mới, Cline phải cập nhật file `README.md` với các thông tin sau:
+* Danh sách chức năng mới 
+* Changelog được bổ sung phiên bản mới
+* Hướng dẫn sử dụng chi tiết cho tính năng mới (nếu cần)
+
+Không được phép thêm chức năng mới mà không cập nhật documentation.
+
+## Final Report (Báo cáo tổng kết bắt buộc)
+Khi hoàn thành, Cline bắt buộc phải gửi một báo cáo chi tiết theo mẫu sau:
+
+### Build Status (Trạng thái biên dịch)
+SUCCESS (Thành công) hoặc FAILED (Thất bại)
+
+### Build Time (Thời gian biên dịch)
+Thời gian cụ thể khi chạy lệnh build thành công.
+
+### Artifact (Đường dẫn sản phẩm)
+Đường dẫn chính xác tới file vừa được tạo ra.
+
+### Artifact Size (Kích thước file)
+Dung lượng chính xác của file.
+
+### SHA256 (Mã định danh file)
+Chuỗi mã hóa SHA256 của file  mới nhất để kiểm tra tính toàn vẹn.
+
+### Paper References Used (Tài liệu Paper đã tham chiếu)
+* Files (Danh sách file)
+* Classes (Danh sách lớp)
+* Methods (Danh sách phương thức)
+
+### Modified Files (Danh sách file đã sửa)
+Liệt kê các file code đã chỉnh sửa.
+
+### Change Summary (Tóm tắt thay đổi)
+Mô tả ngắn gọn các chỉnh sửa đã thực hiện.
+
+---
+
+## Completion Rules (Quy định hoàn thành)
+Cline không được tuyên bố hoàn thành công việc nếu chưa đi qua đủ các bước: Phân tích nguyên nhân -> Sửa lỗi trong Act Mode -> Build thành công bằng lệnh  thủ công -> Xác minh sinh file  mới -> Tính mã SHA256 -> Gửi báo cáo đầy đủ.

@@ -1,0 +1,45 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+# Export DH_VERBOSE for debugging
+export DH_VERBOSE = 1
+
+# Python3 settings
+export PYBUILD_NAME = luckyclick
+export PYBUILD_DISABLE = test
+
+%:
+	dh $@ --with python3
+
+override_dh_auto_install:
+	python3 setup.py install --root=$(CURDIR)/debian/luckyclick --install-layout=deb --no-compile
+
+override_dh_install:
+	dh_install
+	
+	# Install desktop file
+	install -D -m 644 luckyclick.desktop $(CURDIR)/debian/luckyclick/usr/share/applications/luckyclick.desktop
+	
+	# Generate icon sizes from the uploaded icon
+	mkdir -p $(CURDIR)/debian/luckyclick/usr/share/icons/hicolor/256x256/apps
+	install -D -m 644 luckyclick/icon.png \
+		$(CURDIR)/debian/luckyclick/usr/share/icons/hicolor/256x256/apps/luckyclick.png
+	
+	# Use the same icon for all sizes (system will scale as needed)
+	for size in 16 32 48 64 128; do \
+		mkdir -p $(CURDIR)/debian/luckyclick/usr/share/icons/hicolor/$${size}x$${size}/apps; \
+		cp $(CURDIR)/debian/luckyclick/usr/share/icons/hicolor/256x256/apps/luckyclick.png \
+			$(CURDIR)/debian/luckyclick/usr/share/icons/hicolor/$${size}x$${size}/apps/luckyclick.png; \
+	done
+	
+	# Create launcher script
+	mkdir -p $(CURDIR)/debian/luckyclick/usr/bin
+	echo '#!/bin/bash' > $(CURDIR)/debian/luckyclick/usr/bin/luckyclick
+	echo 'exec /usr/bin/python3 -m luckyclick.main' >> $(CURDIR)/debian/luckyclick/usr/bin/luckyclick
+	chmod +x $(CURDIR)/debian/luckyclick/usr/bin/luckyclick
+
+override_dh_compress:
+	dh_compress -X.py
+
+override_dh_strip:
+	# Python packages don't need stripping

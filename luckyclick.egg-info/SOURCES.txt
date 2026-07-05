@@ -1,0 +1,16 @@
+setup.py
+luckyclick/__init__.py
+luckyclick/main.py
+luckyclick.egg-info/PKG-INFO
+luckyclick.egg-info/SOURCES.txt
+luckyclick.egg-info/dependency_links.txt
+luckyclick.egg-info/entry_points.txt
+luckyclick.egg-info/requires.txt
+luckyclick.egg-info/top_level.txt
+luckyclick/core/__init__.py
+luckyclick/core/clicker.py
+luckyclick/core/hotkey_manager.py
+luckyclick/core/recorder.py
+luckyclick/gui/__init__.py
+luckyclick/gui/main_window.py
+luckyclick/gui/overlay.py

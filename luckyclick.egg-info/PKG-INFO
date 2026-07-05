@@ -1,0 +1,26 @@
+Metadata-Version: 2.4
+Name: luckyclick
+Version: 1.0.0
+Summary: LuckyClick - Auto Clicker for Linux
+Home-page: https://github.com/luckyclick
+Author: LuckyClick Team
+Classifier: Development Status :: 4 - Beta
+Classifier: Environment :: X11 Applications :: Qt
+Classifier: Intended Audience :: End Users/Desktop
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: POSIX :: Linux
+Classifier: Programming Language :: Python :: 3
+Classifier: Topic :: Utilities
+Requires-Python: >=3.6
+Requires-Dist: PyQt5>=5.15.0
+Requires-Dist: pynput>=1.7.0
+Requires-Dist: python-xlib>=0.33
+Dynamic: author
+Dynamic: classifier
+Dynamic: description
+Dynamic: home-page
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
+A feature-rich auto clicker for Linux with virtual mouse support, point recording, and system tray integration.

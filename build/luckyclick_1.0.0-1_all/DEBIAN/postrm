@@ -1,0 +1,20 @@
+#!/bin/bash
+# postrm script for LuckyClick
+
+set -e
+
+case "$1" in
+    remove|purge)
+        # Update icon cache
+        if which gtk-update-icon-cache > /dev/null 2>&1; then
+            gtk-update-icon-cache /usr/share/icons/hicolor 2>/dev/null || true
+        fi
+        
+        # Update desktop database
+        if which update-desktop-database > /dev/null 2>&1; then
+            update-desktop-database 2>/dev/null || true
+        fi
+        ;;
+esac
+
+exit 0

@@ -1,0 +1,2 @@
+#!/bin/bash
+cd /usr/share/luckyclick && exec /usr/bin/python3 -m luckyclick.main

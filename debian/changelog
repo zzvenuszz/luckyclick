@@ -1,0 +1,23 @@
+luckyclick (1.1.0-1) unstable; urgency=medium
+
+  * Fix: Smart Click now correctly clicks at recorded positions
+  * Fix: X11 fallback now moves cursor to recorded coordinates before clicking
+  * Fix: pynput fallback now moves cursor to recorded coordinates before clicking
+  * Fix: uinput device struct now properly sets absmax/absmin/absfuzz/absflat
+  * Fix: Coordinate consistency between Smart Click and normal mode on HiDPI
+  * Add: Smart Click mode with per-point click type support
+
+ -- LuckyClick Team <support@luckyclick.dev>  Sun, 05 Jul 2026 12:00:00 +0000
+
+luckyclick (1.0.0-1) unstable; urgency=medium
+
+  * Initial release
+  * Full-featured auto clicker for Linux
+  * Support left, right, middle, double click
+  * Recording mode with drag & drop overlay
+  * Global hotkeys (F4, F8)
+  * Virtual mouse support (uinput)
+  * System tray integration
+  * Bilingual interface (Vietnamese/English)
+
+ -- LuckyClick Team <support@luckyclick.dev>  Mon, 04 Jul 2026 12:00:00 +0000
