@@ -85,12 +85,9 @@
 ---
 
 ## 📸 Screenshots / Ảnh chụp màn hình
+<img width="598" height="639" alt="image" src="https://github.com/user-attachments/assets/1662555d-f0ae-4815-a981-c1d736482d55" />
 
-> *Coming soon — screenshots will be added in a future update.*
->
-> *Sắp ra mắt — ảnh chụp màn hình sẽ được bổ sung trong bản cập nhật sau.*
-
----
+<img width="205" height="144" alt="image" src="https://github.com/user-attachments/assets/1cf4d44d-160b-49e0-9ffc-5e203c481893" />
 
 ## 🔧 Requirements / Yêu cầu hệ thống
 
@@ -411,6 +408,6 @@ copies or substantial portions of the Software.
 ---
 
 <p align="center">
-  Made with 🍀 for the Linux community<br>
-  <sub>Làm bằng 🍀 cho cộng đồng Linux</sub>
+  Make with ❤️ for the Linux community<br>
+  <sub>Dành tặng cho cộng đồng Linux ❤️</sub>
 </p>
