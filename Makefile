@@ -7,6 +7,7 @@
 
 PACKAGE_NAME = luckyclick
 VERSION = 1.1.0
+DEBIAN_REVISION = 2
 
 .PHONY: all install run deb clean
 
@@ -26,13 +27,13 @@ deb:
 	dpkg-buildpackage -b -us -uc
 	
 	# Move the .deb to current directory
-	mv ../$(PACKAGE_NAME)_$(VERSION)-1_all.deb ./ 2>/dev/null || true
+	mv ../$(PACKAGE_NAME)_$(VERSION)-$(DEBIAN_REVISION)_all.deb ./ 2>/dev/null || true
 	
 	@echo ""
 	@echo "============================================"
 	@echo "  ✅ .deb package created!"
-	@echo "  File: $(PACKAGE_NAME)_$(VERSION)-1_all.deb"
-	@echo "  Install with: sudo dpkg -i $(PACKAGE_NAME)_$(VERSION)-1_all.deb"
+	@echo "  File: $(PACKAGE_NAME)_$(VERSION)-$(DEBIAN_REVISION)_all.deb"
+	@echo "  Install with: sudo dpkg -i $(PACKAGE_NAME)_$(VERSION)-$(DEBIAN_REVISION)_all.deb"
 	@echo "============================================"
 
 clean:

@@ -9,10 +9,13 @@ export PYBUILD_NAME = luckyclick
 export PYBUILD_DISABLE = test
 
 %:
-	dh $@ --with python3
+	dh $@ --with python3 --buildsystem=pybuild
+
+override_dh_auto_clean:
+	rm -rf .pybuild
 
 override_dh_auto_install:
-	python3 setup.py install --root=$(CURDIR)/debian/luckyclick --install-layout=deb --no-compile
+	dh_auto_install --destdir=$(CURDIR)/debian/luckyclick
 
 override_dh_install:
 	dh_install

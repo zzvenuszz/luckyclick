@@ -49,6 +49,13 @@ ABS_CNT = 64  # Maximum number of absolute axes
 DEFAULT_SCREEN_W = 1920
 DEFAULT_SCREEN_H = 1080
 
+CLICK_TYPE_LABELS = {
+    'left': 'trái (left)',
+    'right': 'phải (right)',
+    'middle': 'giữa (middle)',
+    'double': 'double click',
+}
+
 
 class VirtualMouse:
     """Virtual mouse device using uinput for non-blocking clicks.
@@ -57,6 +64,7 @@ class VirtualMouse:
 
     def __init__(self):
         self.device = None
+        self.last_backend = 'unavailable'
         self.screen_w = DEFAULT_SCREEN_W
         self.screen_h = DEFAULT_SCREEN_H
         self._detect_screen()
@@ -191,13 +199,23 @@ class VirtualMouse:
         """
         if self.device:
             # Clamp coordinates to screen bounds
+            requested_x, requested_y = x, y
             x = max(0, min(x, self.screen_w))
             y = max(0, min(y, self.screen_h))
+            if (x, y) != (requested_x, requested_y):
+                logger.warning(
+                    "uinput position clamped: requested=%d:%d sent=%d:%d screen=%dx%d",
+                    requested_x, requested_y, x, y, self.screen_w, self.screen_h
+                )
             
             # Write absolute position events
             self._write_event(EV_ABS, ABS_X, x)
             self._write_event(EV_ABS, ABS_Y, y)
             self._syn()
+            logger.info(
+                "uinput absolute position sent: %d:%d px (screen=%dx%d)",
+                x, y, self.screen_w, self.screen_h
+            )
             time.sleep(0.005)  # Small delay to ensure position is registered
 
     def click(self, x: int, y: int, button: str = 'left'):
@@ -222,21 +240,30 @@ class VirtualMouse:
             'middle': BTN_MIDDLE
         }.get(button, BTN_LEFT)
 
-        # Click using virtual device (does not steal real mouse)
+        # X11 can explicitly warp the desktop pointer; sending EV_ABS alone may
+        # be ignored by desktop input stacks even when uinput accepts the event.
+        if self._x11_click(x, y, button):
+            self.last_backend = 'x11-xtest'
+            return
+
+        if self._pynput_click(x, y, button):
+            self.last_backend = 'pynput'
+            return
+
         if self.device:
-            # Move to exact position FIRST
+            logger.warning("Desktop pointer APIs unavailable; falling back to uinput")
             self._move_to(x, y)
             time.sleep(0.005)
-            
-            # Press and release
-            self._write_event(EV_KEY, btn_code, 1)  # Press
+            self._write_event(EV_KEY, btn_code, 1)
             self._syn()
             time.sleep(0.01)
-            self._write_event(EV_KEY, btn_code, 0)  # Release
+            self._write_event(EV_KEY, btn_code, 0)
             self._syn()
-        else:
-            # Fallback: use Xlib
-            self._x11_click(x, y, button)
+            self.last_backend = 'uinput'
+            return
+
+        self.last_backend = 'unavailable'
+        raise RuntimeError("No click backend could move and click the desktop pointer")
 
     def _x11_click(self, x: int, y: int, button: str):
         """Fallback click using X11 - moves cursor to (x,y) first, then clicks."""
@@ -246,11 +273,23 @@ class VirtualMouse:
             
             d = display.Display()
             btn_map = {'left': 1, 'right': 3, 'middle': 2}
-            
             # Move cursor to the recorded position FIRST
             root = d.screen().root
             root.warp_pointer(x, y)
             d.sync()
+            pointer = root.query_pointer()
+            actual_x, actual_y = int(pointer.root_x), int(pointer.root_y)
+            logger.info(
+                "X11 pointer after warp: requested=%d:%d actual=%d:%d px",
+                x, y, actual_x, actual_y
+            )
+            if (actual_x, actual_y) != (x, y):
+                logger.warning(
+                    "X11 pointer did not reach requested position; skipping XTest click"
+                )
+                d.close()
+                return False
+
             time.sleep(0.01)
             
             btn = btn_map.get(button, 1)
@@ -263,18 +302,35 @@ class VirtualMouse:
                 fake_input(d, X.ButtonPress, btn)
                 fake_input(d, X.ButtonRelease, btn)
             d.sync()
+            d.close()
+            logger.info(
+                "X11 XTest click completed at %d:%d px type=%s",
+                x, y, CLICK_TYPE_LABELS.get(button, button)
+            )
+            return True
         except Exception as e:
-            logger.error(f"X11 click fallback failed: {e}")
-            # Last resort: pynput
-            self._pynput_click(x, y, button)
+            logger.exception("X11 click failed at %d:%d px: %s", x, y, e)
+            return False
 
     def _pynput_click(self, x: int, y: int, button: str):
         """Last resort click using pynput - moves cursor to (x,y) first, then clicks."""
         try:
             from pynput.mouse import Button, Controller
             mouse = Controller()
+            logger.info(
+                "pynput pointer move: requested=%d:%d px type=%s",
+                x, y, CLICK_TYPE_LABELS.get(button, button)
+            )
             mouse.position = (x, y)
             time.sleep(0.01)
+            actual_x, actual_y = mouse.position
+            logger.info(
+                "pynput pointer after move: requested=%d:%d actual=%d:%d px",
+                x, y, actual_x, actual_y
+            )
+            if (actual_x, actual_y) != (x, y):
+                logger.warning("pynput pointer did not reach requested position")
+                return False
             btn_map = {
                 'left': Button.left,
                 'right': Button.right,
@@ -286,8 +342,14 @@ class VirtualMouse:
                 mouse.click(btn, 2)
             else:
                 mouse.click(btn, 1)
+            logger.info(
+                "pynput click completed at %d:%d px type=%s",
+                x, y, CLICK_TYPE_LABELS.get(button, button)
+            )
+            return True
         except Exception as e:
-            logger.error(f"pynput click failed: {e}")
+            logger.exception("pynput click failed at %d:%d px: %s", x, y, e)
+            return False
 
     def destroy(self):
         """Destroy the virtual device."""
@@ -343,6 +405,14 @@ class AutoClicker:
             logger.warning("No click points defined")
             return
 
+        mode = 'smart' if self.smart_click else 'normal'
+        logger.info(
+            "Auto clicker configuration: mode=%s points=%d interval_ms=%d "
+            "max_clicks=%d global_type=%s backend_priority=X11/pynput/uinput",
+            mode, len(self.points), self.interval_ms, self.max_clicks,
+            CLICK_TYPE_LABELS.get(self.click_type, self.click_type)
+        )
+
         self._stop_event.clear()
         self._pause_event.clear()
         self._click_count = 0
@@ -355,6 +425,8 @@ class AutoClicker:
     def stop(self):
         """Stop auto clicking. Thread-safe."""
         self._stop_event.set()
+        if self._thread and self._thread is not threading.current_thread():
+            self._thread.join()
         self._running = False
         if self.on_stop:
             self.on_stop()
@@ -385,7 +457,8 @@ class AutoClicker:
                 if self._stop_event.is_set():
                     break
             
-            for point in self.points:
+            point_count = len(self.points)
+            for point_index, point in enumerate(self.points, start=1):
                 # Check stop BEFORE each click
                 if self._stop_event.is_set():
                     break
@@ -399,9 +472,22 @@ class AutoClicker:
                 
                 # Use per-point click_type if smart_click is enabled
                 actual_click_type = point_click_type if self.smart_click else self.click_type
+                click_number = self._click_count + 1
+                mode = 'smart' if self.smart_click else 'normal'
+                logger.info(
+                    "Click #%d | position=%d:%d px | type=%s | mode=%s "
+                    "| point=%d/%d",
+                    click_number, x, y,
+                    CLICK_TYPE_LABELS.get(actual_click_type, actual_click_type),
+                    mode, point_index, point_count
+                )
                 
                 try:
                     self.vmouse.click(x, y, actual_click_type)
+                    logger.info(
+                        "Click #%d completed via backend=%s",
+                        click_number, self.vmouse.last_backend
+                    )
                     self._click_count += 1
                     
                     if self.on_click:
@@ -416,7 +502,9 @@ class AutoClicker:
                         break
                     
                 except Exception as e:
-                    logger.error(f"Click error: {e}")
+                    logger.exception(
+                        "Click #%d failed at %d:%d px: %s", click_number, x, y, e
+                    )
                 
                 # Apply random delay if configured
                 actual_interval = interval_sec
@@ -438,7 +526,6 @@ class AutoClicker:
                     time.sleep(0.01)  # Check every 10ms
         
         self._running = False
-        logger.info("Click loop ended")
 
     def cleanup(self):
         """Clean up resources."""

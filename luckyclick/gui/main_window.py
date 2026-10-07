@@ -732,6 +732,14 @@ class MainWindow(QMainWindow):
 
     def _on_point_recorded(self, x: int, y: int, click_type: str = 'left'):
         """Handle a new point recorded."""
+        if not self.smart_click_check.isChecked():
+            self.smart_click_check.setChecked(True)
+        logger.info(
+            "Recorded point #%d: position=%d:%d px type=%s smart_checkbox=%s mode=%s",
+            len(self.recorder.get_points()), x, y, click_type,
+            self.smart_click_check.isChecked(),
+            'smart' if self._smart_click else 'normal'
+        )
         self._refresh_points_list()
 
     def _refresh_points_list(self):
@@ -804,6 +812,11 @@ class MainWindow(QMainWindow):
         """
         # Get points (needed for both modes)
         points = self.recorder.get_points()
+        logger.info(
+            "Start requested: smart_checkbox=%s internal_mode=%s recorded_points=%d",
+            self.smart_click_check.isChecked(),
+            'smart' if self._smart_click else 'normal', len(points)
+        )
         
         # Smart Click mode requires at least one recorded point
         if self._smart_click:
@@ -877,7 +890,12 @@ class MainWindow(QMainWindow):
                 2000
             )
         
-        logger.info(f"Auto click started: {len(points)} points, interval={interval}ms, type={click_type}")
+        logger.info(
+            "Auto click started: mode=%s recorded_points=%d active_points=%d "
+            "interval_ms=%d global_type=%s",
+            'smart' if self.clicker.smart_click else 'normal', len(points),
+            len(self.clicker.points), interval, click_type
+        )
 
     def _on_stop(self):
         """Stop auto clicking."""
@@ -997,7 +1015,12 @@ class MainWindow(QMainWindow):
                 if 'points' in profile:
                     points = [(p['x'], p['y'], p.get('click_type', 'left')) for p in profile['points']]
                     self.recorder.set_points(points)
+                    self.smart_click_check.setChecked(bool(points))
                     self._refresh_points_list()
+                    logger.info(
+                        "Profile points loaded: count=%d smart_mode=%s",
+                        len(points), self._smart_click
+                    )
                 
                 # Load interval
                 if 'interval' in profile:

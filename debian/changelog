@@ -1,3 +1,13 @@
+luckyclick (1.1.0-2) unstable; urgency=medium
+
+  * Fix: Automatically enable Smart Click for recorded and loaded points
+  * Fix: Wait for the click thread to stop before returning from Stop
+  * Fix: Warp the X11 desktop pointer before clicking recorded positions
+  * Build: Declare debhelper compatibility and Python addon dependencies
+  * Build: Restrict pybuild clean to its temporary build directory
+
+ -- LuckyClick Team <support@luckyclick.dev>  Wed, 07 Oct 2026 00:00:00 +0000
+
 luckyclick (1.1.0-1) unstable; urgency=medium
 
   * Fix: Smart Click now correctly clicks at recorded positions
