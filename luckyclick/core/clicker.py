@@ -12,6 +12,9 @@ import struct
 import fcntl
 import logging
 from typing import Callable, Optional
+from pynput import keyboard
+
+from luckyclick.core.hotkey_manager import parse_key_from_string
 
 logger = logging.getLogger(__name__)
 
@@ -374,12 +377,13 @@ class AutoClicker:
         self._pause_event = threading.Event()
         
         # Configuration
-        self.points: list[tuple[int, int, str]] = []  # (x, y, click_type)
+        self.points: list = []
         self.interval_ms: int = 1000  # milliseconds
         self.click_type: str = 'left'  # Default fallback
         self.max_clicks: int = 0  # 0 = unlimited
         self.random_delay_pct: int = 0  # 0-100
         self.smart_click: bool = False  # If True, use per-point click_type
+        self.smart_delay: bool = False  # If True, use per-action delays
         
         # Callbacks
         self.on_click: Optional[Callable] = None
@@ -444,12 +448,63 @@ class AutoClicker:
         self._pause_event.clear()
         logger.info("Auto clicker resumed")
 
+    def _action_interval(self, delay_ms: int) -> float:
+        """Resolve the global or per-action delay, including random variation."""
+        delay = (
+            max(0, int(delay_ms)) / 1000.0
+            if self.smart_delay else self.interval_ms / 1000.0
+        )
+        if self.random_delay_pct > 0:
+            import random
+            variation = delay * (self.random_delay_pct / 100.0)
+            delay = max(0.01, delay + random.uniform(-variation, variation))
+        return delay
+
+    def _wait_interval(self, interval: float):
+        """Wait for an interval while respecting stop and pause requests."""
+        wait_start = time.time()
+        while time.time() - wait_start < interval:
+            if self._stop_event.is_set():
+                break
+            if self._pause_event.is_set():
+                self._pause_event.wait()
+                if self._stop_event.is_set():
+                    break
+            time.sleep(0.01)
+
+    def _wait_after_action(self, delay_ms: int, action_description: str):
+        """Log and apply the configured delay after the completed action."""
+        interval = self._action_interval(delay_ms)
+        logger.info(
+            "Đang delay %.0f ms sau %s...",
+            interval * 1000,
+            action_description
+        )
+        self._wait_interval(interval)
+
+    @staticmethod
+    def _send_key_action(keys):
+        key_objects = []
+        for key_name in keys:
+            key = parse_key_from_string(key_name)
+            if key is None:
+                raise ValueError("Unsupported key: {}".format(key_name))
+            key_objects.append(key)
+
+        controller = keyboard.Controller()
+        pressed_keys = []
+        try:
+            for key in key_objects:
+                controller.press(key)
+                pressed_keys.append(key)
+        finally:
+            for key in reversed(pressed_keys):
+                controller.release(key)
+
     def _click_loop(self):
         """Main click loop running in background thread.
         Checks stop_event AFTER EACH CLICK to ensure immediate stop.
         """
-        interval_sec = self.interval_ms / 1000.0
-        
         while not self._stop_event.is_set():
             # Check pause
             if self._pause_event.is_set():
@@ -463,12 +518,34 @@ class AutoClicker:
                 if self._stop_event.is_set():
                     break
                 
-                # Unpack point - supports both (x, y) and (x, y, click_type)
-                if len(point) == 3:
-                    x, y, point_click_type = point
+                if isinstance(point, dict):
+                    delay_ms = point.get('delay_ms', 1000)
+                    if point.get('type') == 'key':
+                        keys = point.get('keys', [])
+                        logger.info(
+                            "Key action #%d | keys=%s", point_index, '+'.join(keys)
+                        )
+                        try:
+                            self._send_key_action(keys)
+                        except Exception:
+                            logger.exception(
+                                "Key action #%d failed for keys=%s",
+                                point_index, '+'.join(keys)
+                            )
+                        self._wait_after_action(
+                            delay_ms,
+                            "phím {}".format('+'.join(keys))
+                        )
+                        continue
+                    x, y = point['x'], point['y']
+                    point_click_type = point.get('click_type', self.click_type)
                 else:
-                    x, y = point[:2]
-                    point_click_type = self.click_type
+                    delay_ms = 1000
+                    if len(point) == 3:
+                        x, y, point_click_type = point
+                    else:
+                        x, y = point[:2]
+                        point_click_type = self.click_type
                 
                 # Use per-point click_type if smart_click is enabled
                 actual_click_type = point_click_type if self.smart_click else self.click_type
@@ -506,24 +583,10 @@ class AutoClicker:
                         "Click #%d failed at %d:%d px: %s", click_number, x, y, e
                     )
                 
-                # Apply random delay if configured
-                actual_interval = interval_sec
-                if self.random_delay_pct > 0:
-                    import random
-                    variation = actual_interval * (self.random_delay_pct / 100.0)
-                    actual_interval += random.uniform(-variation, variation)
-                    actual_interval = max(0.01, actual_interval)
-                
-                # Wait interval - but check stop_event frequently
-                wait_start = time.time()
-                while time.time() - wait_start < actual_interval:
-                    if self._stop_event.is_set():
-                        break
-                    if self._pause_event.is_set():
-                        self._pause_event.wait()
-                        if self._stop_event.is_set():
-                            break
-                    time.sleep(0.01)  # Check every 10ms
+                self._wait_after_action(
+                    delay_ms,
+                    "click #{}".format(click_number)
+                )
         
         self._running = False
 

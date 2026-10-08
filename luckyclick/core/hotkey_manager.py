@@ -6,7 +6,7 @@ Supports custom key capture for user-defined hotkeys.
 
 import threading
 import logging
-from typing import Callable, Optional, Dict, Any
+from typing import Callable, Optional, Dict, Set
 from pynput import keyboard
 
 logger = logging.getLogger(__name__)
@@ -59,16 +59,29 @@ def key_to_string(key) -> Optional[str]:
     Returns:
         String representation, or None if conversion fails
     """
-    if hasattr(key, 'name'):
-        # Special key (F1-F12, etc.)
-        name = key.name
-        # Capitalize first letter for consistency
+    name = getattr(key, 'name', None)
+    if name:
+        modifier_names = {
+            'ctrl': 'Ctrl', 'ctrl_l': 'Ctrl', 'ctrl_r': 'Ctrl',
+            'shift': 'Shift', 'shift_l': 'Shift', 'shift_r': 'Shift',
+            'alt': 'Alt', 'alt_l': 'Alt', 'alt_r': 'Alt', 'alt_gr': 'Alt',
+            'cmd': 'Super', 'cmd_l': 'Super', 'cmd_r': 'Super',
+        }
+        if name in modifier_names:
+            return modifier_names[name]
         if name.startswith('f') and name[1:].isdigit():
             return name.upper()
-        # CamelCase for multi-word names
+        special_names = {
+            'esc': 'Escape',
+            'page_up': 'PageUp',
+            'page_down': 'PageDown',
+            'print_screen': 'PrintScreen',
+            'scroll_lock': 'ScrollLock',
+        }
+        if name in special_names:
+            return special_names[name]
         return ''.join(word.capitalize() for word in name.split('_'))
     elif hasattr(key, 'char'):
-        # Character key
         char = key.char
         if char is not None:
             return char.upper()
@@ -105,6 +118,9 @@ def parse_key_from_string(key_str: str):
         'Shift': keyboard.Key.shift,
         'Ctrl': keyboard.Key.ctrl,
         'Alt': keyboard.Key.alt,
+        'Super': keyboard.Key.cmd,
+        'CapsLock': keyboard.Key.caps_lock,
+        'NumLock': keyboard.Key.num_lock,
         'Up': keyboard.Key.up,
         'Down': keyboard.Key.down,
         'Left': keyboard.Key.left,
@@ -128,6 +144,9 @@ class HotkeyManager:
         # Custom key capture state
         self._capturing = False
         self._capture_callback: Optional[Callable[[str], None]] = None
+        self._capture_combination = False
+        self._capture_pressed: Set[object] = set()
+        self._capture_keys: list = []
 
     def register_hotkey(self, key_name: str, callback: Callable) -> bool:
         """Register a hotkey with a callback function.
@@ -161,15 +180,19 @@ class HotkeyManager:
                 self._hotkeys.pop(key, None)
                 logger.info(f"Unregistered hotkey: {key_name}")
 
-    def start_capture(self, callback: Callable[[str], None]):
+    def start_capture(self, callback: Callable[[str], None], combination: bool = False):
         """Start capturing the next key press as a custom hotkey.
         
         Args:
             callback: Function to call with the captured key name string
+            combination: Capture a key chord until all keys are released.
         """
         with self._lock:
             self._capturing = True
             self._capture_callback = callback
+            self._capture_combination = combination
+            self._capture_pressed.clear()
+            self._capture_keys = []
         logger.info("Started custom hotkey capture")
 
     def cancel_capture(self):
@@ -177,6 +200,8 @@ class HotkeyManager:
         with self._lock:
             self._capturing = False
             self._capture_callback = None
+            self._capture_pressed.clear()
+            self._capture_keys = []
         logger.info("Cancelled custom hotkey capture")
 
     def start(self):
@@ -185,7 +210,10 @@ class HotkeyManager:
             return
         
         self._running = True
-        self._listener = keyboard.Listener(on_press=self._on_press)
+        self._listener = keyboard.Listener(
+            on_press=self._on_press,
+            on_release=self._on_release
+        )
         self._listener.daemon = True
         self._listener.start()
         logger.info("Hotkey listener started")
@@ -195,6 +223,8 @@ class HotkeyManager:
         self._running = False
         self._capturing = False
         self._capture_callback = None
+        self._capture_pressed.clear()
+        self._capture_keys = []
         if self._listener:
             self._listener.stop()
             self._listener = None
@@ -208,11 +238,17 @@ class HotkeyManager:
                 if self._capturing and self._capture_callback:
                     key_str = key_to_string(key)
                     if key_str:
-                        self._capturing = False
-                        cb = self._capture_callback
-                        self._capture_callback = None
-                        # Run callback in separate thread
-                        threading.Thread(target=cb, args=(key_str,), daemon=True).start()
+                        if self._capture_combination:
+                            self._capture_pressed.add(key)
+                            if key_str not in self._capture_keys:
+                                self._capture_keys.append(key_str)
+                        else:
+                            self._capturing = False
+                            cb = self._capture_callback
+                            self._capture_callback = None
+                            threading.Thread(
+                                target=cb, args=(key_str,), daemon=True
+                            ).start()
                         return
             
             # Normal hotkey dispatch
@@ -223,6 +259,37 @@ class HotkeyManager:
                     threading.Thread(target=callback, daemon=True).start()
         except Exception as e:
             logger.error(f"Hotkey handler error: {e}")
+
+    def _on_release(self, key):
+        """Finish a captured chord once every key has been released."""
+        try:
+            with self._lock:
+                if not self._capturing or not self._capture_combination:
+                    return
+                self._capture_pressed.discard(key)
+                if self._capture_pressed or not self._capture_keys:
+                    return
+
+                modifiers = {'Ctrl', 'Shift', 'Alt', 'Super'}
+                ordered_keys = sorted(
+                    self._capture_keys,
+                    key=lambda name: (
+                        name not in modifiers,
+                        self._capture_keys.index(name)
+                    )
+                )
+                key_str = '+'.join(ordered_keys)
+                callback = self._capture_callback
+                self._capturing = False
+                self._capture_callback = None
+                self._capture_keys = []
+
+            if callback:
+                threading.Thread(
+                    target=callback, args=(key_str,), daemon=True
+                ).start()
+        except Exception as e:
+            logger.error(f"Hotkey capture error: {e}")
 
     @staticmethod
     def get_available_keys() -> list:

@@ -51,6 +51,11 @@ STR = {
     'random_delay': 'Random delay (%):',
     'points_list': 'Danh sách điểm click (Click points):',
     'no_points': 'Chưa có điểm nào. Bấm F4 để record.',
+    'action_column': 'Thao tác (Action)',
+    'delay_column': 'Delay (ms)',
+    'smart_delay': 'Áp dụng Smart Delay',
+    'add_key': 'Thêm phím',
+    'key_capture_prompt': 'Nhấn phím hoặc tổ hợp phím cần thêm...',
     'start_btn': '▶ Bắt đầu (Start)',
     'stop_btn': '⏹ Dừng (Stop)',
     'delete_btn': 'Xóa (Delete)',
@@ -88,6 +93,7 @@ class MainWindow(QMainWindow):
     # Signal to safely trigger hotkey actions from background threads
     # This prevents Qt crashes when hotkey callbacks fire from pynput threads
     hotkey_triggered = pyqtSignal(str)
+    key_action_captured = pyqtSignal(str)
 
     def __init__(self):
         super().__init__()
@@ -104,6 +110,7 @@ class MainWindow(QMainWindow):
         self._running = False
         self._current_hotkey = 'F8'  # Default start/stop hotkey
         self._smart_click = False
+        self._recording_restore_window = False
         
         # Setup UI
         self._setup_ui()
@@ -113,6 +120,7 @@ class MainWindow(QMainWindow):
         
         # Connect hotkey signal to main thread handler
         self.hotkey_triggered.connect(self._on_hotkey_triggered)
+        self.key_action_captured.connect(self._on_key_action_captured)
         
         # Start hotkey listener
         self.hotkey_manager.start()
@@ -139,8 +147,8 @@ class MainWindow(QMainWindow):
         title_label = QLabel("🍀 LuckyClick")
         title_label.setAlignment(Qt.AlignCenter)
         title_label.setStyleSheet("""
-            font-size: 22px; font-weight: bold; color: #2E7D32;
-            padding: 8px;
+            font-size: 18px; font-weight: bold; color: #2E7D32;
+            padding: 4px;
         """)
         main_layout.addWidget(title_label)
         
@@ -225,7 +233,7 @@ class MainWindow(QMainWindow):
         self.click_type_combo.addItems([
             STR['left'], STR['right'], STR['middle'], STR['double']
         ])
-        self.click_type_combo.setFixedWidth(180)
+        self.click_type_combo.setFixedWidth(126)
         row_layout.addWidget(self.click_type_combo)
         
         row_layout.addSpacing(20)
@@ -235,7 +243,7 @@ class MainWindow(QMainWindow):
         self.hotkey_combo = QComboBox()
         self.hotkey_combo.addItems(HotkeyManager.get_available_keys())
         self.hotkey_combo.setCurrentText('F8')
-        self.hotkey_combo.setFixedWidth(150)
+        self.hotkey_combo.setFixedWidth(45)
         row_layout.addWidget(self.hotkey_combo)
         
         row_layout.addStretch()
@@ -290,17 +298,19 @@ class MainWindow(QMainWindow):
         delay_layout.addStretch()
         settings_layout.addLayout(delay_layout)
         
-        settings_group.setLayout(settings_layout)
-        main_layout.addWidget(settings_group)
-        
         # === Smart Click Mode ===
         smart_layout = QHBoxLayout()
         self.smart_click_check = QCheckBox(STR['smart_click'])
         self.smart_click_check.setChecked(False)
         self.smart_click_check.toggled.connect(self._on_smart_click_toggled)
         smart_layout.addWidget(self.smart_click_check)
+        self.smart_delay_check = QCheckBox(STR['smart_delay'])
+        self.smart_delay_check.setChecked(False)
+        smart_layout.addWidget(self.smart_delay_check)
         smart_layout.addStretch()
         settings_layout.addLayout(smart_layout)
+        settings_group.setLayout(settings_layout)
+        main_layout.addWidget(settings_group)
         
         # === Points List Group ===
         points_group = QGroupBox(STR['points_list'])
@@ -309,6 +319,8 @@ class MainWindow(QMainWindow):
         
         self.points_list = QListWidget()
         self.points_list.setAlternatingRowColors(True)
+        self.points_list.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.points_list.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.points_list.setStyleSheet("""
             QListWidget {
                 border: 1px solid #BDBDBD;
@@ -325,7 +337,14 @@ class MainWindow(QMainWindow):
                 color: #1B5E20;
             }
         """)
-        self.points_list.setMinimumHeight(150)
+        self.points_list.setMinimumHeight(0)
+        list_header = QHBoxLayout()
+        list_header.setContentsMargins(8, 0, 8, 0)
+        list_header.addWidget(QLabel(STR['action_column']), 1)
+        delay_header = QLabel(STR['delay_column'])
+        delay_header.setFixedWidth(115)
+        list_header.addWidget(delay_header)
+        points_layout.addLayout(list_header)
         points_layout.addWidget(self.points_list)
         
         # Points control buttons
@@ -341,6 +360,10 @@ class MainWindow(QMainWindow):
             QPushButton:hover { background-color: #F57C00; }
         """)
         points_btn_layout.addWidget(self.record_btn)
+
+        self.add_key_btn = QPushButton(STR['add_key'])
+        self.add_key_btn.clicked.connect(self._start_key_action_capture)
+        points_btn_layout.addWidget(self.add_key_btn)
         
         self.delete_btn = QPushButton(STR['delete_btn'])
         self.delete_btn.setStyleSheet("""
@@ -366,7 +389,8 @@ class MainWindow(QMainWindow):
         points_layout.addLayout(points_btn_layout)
         
         points_group.setLayout(points_layout)
-        main_layout.addWidget(points_group)
+        points_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        main_layout.addWidget(points_group, 1)
         
         # === Control Buttons ===
         control_layout = QHBoxLayout()
@@ -606,8 +630,9 @@ class MainWindow(QMainWindow):
         """Handle Smart Click checkbox toggle.
         
         When Smart Click is enabled:
-        - Uses per-point click types from recorded points
-        - Click type dropdown is disabled (per-point types override)
+        - Plays recorded click and keyboard actions in order
+        - Click type dropdown is disabled (recorded click types override)
+        - Smart Delay checkbox selects per-action delays instead of the global interval
         
         When Smart Click is disabled:
         - Uses the global click type from dropdown
@@ -685,15 +710,24 @@ class MainWindow(QMainWindow):
 
     def _toggle_recording(self):
         """Toggle recording mode on/off."""
+        if self._running:
+            logger.warning("Recording mode cannot be entered while auto click is running")
+            self.status_label.setText("Không thể record khi auto click đang chạy")
+            return
         if self._recording_mode:
             self._exit_recording_mode()
         else:
             self._enter_recording_mode()
 
     def _enter_recording_mode(self):
-        """Enter recording mode - show overlay."""
+        """Enter recording mode, hiding the main window behind the overlay."""
+        if self._running:
+            logger.warning("Recording mode cannot be entered while auto click is running")
+            return
+        self._recording_restore_window = self.isVisible()
         self._recording_mode = True
         self.overlay.show()
+        self.hide()
         self.record_btn.setText(STR['recording_on'])
         self.record_btn.setStyleSheet("""
             QPushButton {
@@ -720,6 +754,11 @@ class MainWindow(QMainWindow):
             QPushButton:hover { background-color: #F57C00; }
         """)
         self.status_label.setText("Sẵn sàng (Ready)")
+        if self._recording_restore_window:
+            self.show()
+            self.raise_()
+            self.activateWindow()
+        self._recording_restore_window = False
         logger.info("Recording mode exited")
 
     def _on_overlay_point(self, x: int, y: int, click_type: str = 'left'):
@@ -730,17 +769,46 @@ class MainWindow(QMainWindow):
         """Handle coordinate update from overlay."""
         self.status_label.setText(f"📍 Tọa độ (Coordinates): X={x}, Y={y}")
 
-    def _on_point_recorded(self, x: int, y: int, click_type: str = 'left'):
-        """Handle a new point recorded."""
+    def _on_point_recorded(self, point: dict):
+        """Handle a new click or key action recorded."""
         if not self.smart_click_check.isChecked():
             self.smart_click_check.setChecked(True)
-        logger.info(
-            "Recorded point #%d: position=%d:%d px type=%s smart_checkbox=%s mode=%s",
-            len(self.recorder.get_points()), x, y, click_type,
-            self.smart_click_check.isChecked(),
-            'smart' if self._smart_click else 'normal'
-        )
+        if point['type'] == 'key':
+            logger.info(
+                "Recorded key action #%d: keys=%s",
+                len(self.recorder.get_points()), '+'.join(point['keys'])
+            )
+        else:
+            logger.info(
+                "Recorded point #%d: position=%d:%d px type=%s smart_checkbox=%s mode=%s",
+                len(self.recorder.get_points()), point['x'], point['y'],
+                point['click_type'], self.smart_click_check.isChecked(),
+                'smart' if self._smart_click else 'normal'
+            )
         self._refresh_points_list()
+
+    def _start_key_action_capture(self):
+        """Capture a single key or key combination for the action sequence."""
+        self.status_label.setText(STR['key_capture_prompt'])
+        self.status_label.setStyleSheet(
+            "color: #FF9800; font-size: 11px; font-weight: bold;"
+        )
+        self.hotkey_manager.start_capture(
+            lambda keys: self.key_action_captured.emit(keys),
+            combination=True
+        )
+
+    def _on_key_action_captured(self, keys: str):
+        """Add the captured key action on the Qt main thread."""
+        self.recorder.add_key_action(keys.split('+'))
+        self.status_label.setText("✅ Đã thêm phím: {}".format(keys))
+        self.status_label.setStyleSheet(
+            "color: #2E7D32; font-size: 11px; font-weight: bold;"
+        )
+
+    def _set_action_delay(self, index: int, delay_ms: int):
+        """Persist an edited delay from a row's spin box."""
+        self.recorder.set_delay(index, delay_ms)
 
     def _refresh_points_list(self):
         """Refresh the points list widget."""
@@ -755,15 +823,38 @@ class MainWindow(QMainWindow):
             return
         
         for i, point in enumerate(points):
-            # Handle both (x, y) and (x, y, click_type) formats
-            if len(point) == 3:
-                x, y, click_type = point
-                type_symbol = {'left': '🖱', 'right': '🖱R', 'double': '🔄', 'middle': '🖱M'}.get(click_type, '')
-                item = QListWidgetItem(f"#{i+1}  X: {x}  Y: {y}  {type_symbol}")
+            if point['type'] == 'key':
+                description = "⌨  {}".format('+'.join(point['keys']))
             else:
-                x, y = point[:2]
-                item = QListWidgetItem(f"#{i+1}  X: {x}  Y: {y}")
+                type_symbol = {
+                    'left': '🖱', 'right': '🖱R',
+                    'double': '🔄', 'middle': '🖱M'
+                }.get(point['click_type'], '')
+                description = "X: {}  Y: {}  {}".format(
+                    point['x'], point['y'], type_symbol
+                )
+
+            row = QWidget()
+            row.setFixedHeight(30)
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(8, 0, 8, 0)
+            row_layout.addWidget(QLabel("#{}  {}".format(i + 1, description)), 1)
+            delay_spin = QSpinBox()
+            delay_spin.setRange(0, 3600000)
+            delay_spin.setSingleStep(1000)
+            delay_spin.setSuffix(" ms")
+            delay_spin.setFixedWidth(115)
+            delay_spin.setFixedHeight(30)
+            delay_spin.setValue(point.get('delay_ms', 1000))
+            delay_spin.valueChanged.connect(
+                lambda value, index=i: self._set_action_delay(index, value)
+            )
+            row_layout.addWidget(delay_spin)
+
+            item = QListWidgetItem()
+            item.setSizeHint(row.sizeHint())
             self.points_list.addItem(item)
+            self.points_list.setItemWidget(item, row)
 
     def _delete_point(self):
         """Delete the selected point."""
@@ -801,8 +892,8 @@ class MainWindow(QMainWindow):
         """Start auto clicking.
         
         If Smart Click is enabled:
-        - Uses recorded points with their per-point click types
-        - Click type dropdown is ignored (per-point types override)
+        - Uses the recorded click and keyboard action sequence
+        - Smart Delay optionally applies each action's recorded delay
         - Requires at least one recorded point
         
         If Smart Click is disabled:
@@ -810,6 +901,9 @@ class MainWindow(QMainWindow):
         - Uses the global click type from dropdown
         - Does NOT require any recorded points
         """
+        if self._recording_mode:
+            self._exit_recording_mode()
+
         # Get points (needed for both modes)
         points = self.recorder.get_points()
         logger.info(
@@ -848,7 +942,7 @@ class MainWindow(QMainWindow):
         
         # Configure clicker
         if self._smart_click:
-            # Smart Click: use recorded points with their per-point click types
+            # Smart Click: use the recorded click and keyboard action sequence.
             self.clicker.points = points
             self.clicker.smart_click = True
         else:
@@ -869,10 +963,15 @@ class MainWindow(QMainWindow):
         self.clicker.click_type = click_type
         self.clicker.max_clicks = max_clicks
         self.clicker.random_delay_pct = self.delay_slider.value()
+        self.clicker.smart_delay = (
+            self._smart_click and self.smart_delay_check.isChecked()
+        )
         
         # Start
         self.clicker.start()
         self._running = True
+        self.record_btn.setEnabled(False)
+        self.add_key_btn.setEnabled(False)
         
         # Update UI
         self.start_btn.setEnabled(False)
@@ -905,6 +1004,8 @@ class MainWindow(QMainWindow):
         # Update UI
         self.start_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
+        self.record_btn.setEnabled(True)
+        self.add_key_btn.setEnabled(True)
         self.status_label.setText(STR['stopped'])
         self.status_label.setStyleSheet("color: #F44336; font-size: 11px;")
         
@@ -935,12 +1036,16 @@ class MainWindow(QMainWindow):
         self._running = False
         self.start_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
+        self.record_btn.setEnabled(True)
+        self.add_key_btn.setEnabled(True)
 
     def _on_clicker_finished(self):
         """Called when clicker finishes all clicks."""
         self._running = False
         self.start_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
+        self.record_btn.setEnabled(True)
+        self.add_key_btn.setEnabled(True)
         self.status_label.setText(STR['finished'].format(count=self.clicker.click_count))
         self.status_label.setStyleSheet("color: #2E7D32; font-size: 11px; font-weight: bold;")
         
@@ -979,7 +1084,7 @@ class MainWindow(QMainWindow):
         )
         if filepath:
             profile = {
-                'points': [{'x': x, 'y': y, 'click_type': t} for x, y, t in self.recorder.get_points()],
+                'points': self.recorder.get_points(),
                 'interval': {
                     'hours': self.hours_spin.value(),
                     'minutes': self.minutes_spin.value(),
@@ -991,7 +1096,8 @@ class MainWindow(QMainWindow):
                 'unlimited': self.unlimited_radio.isChecked(),
                 'max_clicks': self.max_clicks_spin.value(),
                 'auto_hide': self.auto_hide_check.isChecked(),
-                'random_delay': self.delay_slider.value()
+                'random_delay': self.delay_slider.value(),
+                'smart_delay': self.smart_delay_check.isChecked(),
             }
             try:
                 with open(filepath, 'w') as f:
@@ -1013,7 +1119,7 @@ class MainWindow(QMainWindow):
                 
                 # Load points
                 if 'points' in profile:
-                    points = [(p['x'], p['y'], p.get('click_type', 'left')) for p in profile['points']]
+                    points = profile['points']
                     self.recorder.set_points(points)
                     self.smart_click_check.setChecked(bool(points))
                     self._refresh_points_list()
@@ -1071,6 +1177,8 @@ class MainWindow(QMainWindow):
                 
                 if 'random_delay' in profile:
                     self.delay_slider.setValue(profile['random_delay'])
+
+                self.smart_delay_check.setChecked(profile.get('smart_delay', False))
                 
                 QMessageBox.information(self, STR['info'], STR['profile_loaded'])
                 

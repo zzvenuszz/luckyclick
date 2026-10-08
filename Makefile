@@ -6,8 +6,8 @@
 #   clean       - Clean build artifacts
 
 PACKAGE_NAME = luckyclick
-VERSION = 1.1.0
-DEBIAN_REVISION = 2
+VERSION = 1.1.2
+DEBIAN_REVISION = 0
 
 .PHONY: all install run deb clean
 

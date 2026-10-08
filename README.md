@@ -7,7 +7,7 @@
 ---
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.1.0-brightgreen.svg" alt="Version 1.1.0"/>
+  <img src="https://img.shields.io/badge/version-1.1.2-brightgreen.svg" alt="Version 1.1.2"/>
   <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"/>
   <img src="https://img.shields.io/badge/platform-Linux-lightgrey.svg" alt="Platform: Linux"/>
   <img src="https://img.shields.io/badge/python-3.6%2B-yellow.svg" alt="Python 3.6+"/>
@@ -48,7 +48,8 @@
 - **Virtual Mouse Technology** — Uses Linux `uinput` kernel module for non-blocking clicks that don't interfere with your physical mouse
 - **Multiple Click Types** — Left click, right click, middle click, and double click
 - **Point Recording** — Drag & drop recording with real-time coordinate display via overlay
-- **Smart Click Mode** — Assign different click types to different recorded points
+- **Smart Click Mode** — Combine recorded clicks and keyboard shortcuts in a sequence
+- **Per-action delay** — Configure a separate delay in milliseconds after every click or key action
 - **Customizable Interval** — Set interval from milliseconds to hours with precision
 - **Global Hotkeys** — F4 for recording mode, F8 for start/stop (fully customizable)
 - **System Tray Integration** — Minimize to tray with auto-hide on start
@@ -68,7 +69,8 @@
 - **Công nghệ chuột ảo** — Sử dụng module nhân `uinput` của Linux để click không chiếm chuột vật lý
 - **Nhiều loại click** — Click chuột trái, phải, giữa và double click
 - **Ghi điểm click** — Kéo thả ghi điểm với hiển thị tọa độ thời gian thực qua lớp phủ
-- **Chế độ Smart Click** — Gán loại click khác nhau cho từng điểm đã ghi
+- **Chế độ Smart Click** — Kết hợp điểm click và phím/tổ hợp phím trong cùng một chuỗi
+- **Độ trễ từng thao tác** — Tùy chỉnh delay mili giây sau mỗi lần click hoặc bấm phím
 - **Khoảng cách tùy chỉnh** — Đặt khoảng cách từ mili giây đến giờ với độ chính xác cao
 - **Phím tắt toàn cục** — F4 để bật chế độ ghi, F8 để bắt đầu/dừng (có thể tùy chỉnh)
 - **Tích hợp khay hệ thống** — Thu nhỏ xuống khay với chế độ tự động ẩn khi chạy
@@ -132,7 +134,7 @@ sudo chmod 666 /dev/uinput
 Download the latest `.deb` package from the [Releases](https://github.com/zzvenuszz/luckyclick/releases) page, then install:
 
 ```bash
-sudo dpkg -i luckyclick_1.1.0-1_all.deb
+sudo dpkg -i luckyclick_1.1.2-0_all.deb
 sudo apt-get install -f  # Install missing dependencies
 ```
 
@@ -182,16 +184,20 @@ Hoặc tìm **LuckyClick** trong menu ứng dụng (mục "Tiện ích" hoặc t
    
    **Nhấn F4** hoặc bấm nút **"Chế độ record (Record mode)"** để vào chế độ ghi
 
-2. A transparent overlay will appear on your screen. **Drag** from the overlay to any position to record a click point
+2. The main window will be temporarily hidden and a transparent overlay will appear. **Drag** from the overlay to any position to record a click point. Recording cannot be started while auto-click is running.
    
-   Một lớp phủ trong suốt sẽ xuất hiện. **Kéo thả** từ overlay đến vị trí bất kỳ để ghi điểm click
+   Cửa sổ chính sẽ tạm ẩn và một lớp phủ trong suốt xuất hiện. **Kéo thả** từ overlay đến vị trí bất kỳ để ghi điểm click. Không thể bật chế độ record khi auto click đang chạy.
 
-3. The recorded point will appear in the list with its coordinates and click type
+3. The recorded point will appear in the list with its coordinates and click type. Each new action starts with a 1000 ms delay; edit the value or use the spin buttons to change it.
    
-   Điểm đã ghi sẽ xuất hiện trong danh sách kèm tọa độ và loại click
+   Điểm đã ghi sẽ xuất hiện trong danh sách kèm tọa độ và loại click. Mỗi thao tác mới có delay mặc định 1000 ms; sửa trực tiếp giá trị hoặc dùng nút tăng/giảm.
 
-4. **Press F4** again or click the button to exit recording mode
-   
+4. Use **"Thêm phím"** to capture a single key (such as F5) or a combination (such as Ctrl+A or Ctrl+Shift+A) and add it to the sequence.
+
+   Dùng nút **"Thêm phím"** để ghi một phím (ví dụ F5) hoặc tổ hợp phím (ví dụ Ctrl+A, Ctrl+Shift+A) vào chuỗi.
+
+5. **Press F4** again or click the button to exit recording mode
+
    **Nhấn F4** lần nữa hoặc bấm nút để thoát chế độ ghi
 
 ---
@@ -242,14 +248,14 @@ Actual Interval = Base Interval ± Random(0, Base Interval × RandomDelay%)
 
 ### Smart Click Mode / Chế độ Smart Click
 
-When **Smart Click** is enabled, each recorded point can have its own click type. This allows you to record a sequence like:
+When **Smart Click** is enabled, the recorded click and key actions run in order. Each row can have its own delay. Enable **Smart Delay** to apply each row's delay; otherwise, the global interval is used for every action.
 
-Khi bật **Smart Click**, mỗi điểm ghi có thể có loại click riêng. Điều này cho phép bạn ghi một chuỗi như:
+Khi bật **Smart Click**, các click và phím đã ghi được thực hiện theo thứ tự. Mỗi dòng có thể có delay riêng. Bật **Áp dụng Smart Delay** để dùng delay của từng dòng; nếu tắt, mọi thao tác dùng khoảng cách global.
 
 ```
 Point 1:  X: 500  Y: 300  🖱 (Left click / Chuột trái)
-Point 2:  X: 800  Y: 400  🔄 (Double click)
-Point 3:  X: 200  Y: 600  🖱R (Right click / Chuột phải)
+Point 2:  Ctrl+A
+Point 3:  X: 800  Y: 400  🔄 (Double click)
 ```
 
 When Smart Click is **disabled**, all clicks use the global click type selected in the dropdown.
@@ -309,43 +315,44 @@ luckyclick/
 sudo apt-get install devscripts debhelper python3-all python3-setuptools
 
 # Build the package / Build gói
-make build-deb
+make deb
 
-# Output file / File đầu ra: build/luckyclick_1.1.0-1_all.deb
+# Output file / File đầu ra: luckyclick_1.1.2-0_all.deb
 ```
 
 ### Manual Build Steps / Các bước build thủ công
 
 ```bash
 # 1. Create directory structure / Tạo cấu trúc thư mục
-mkdir -p build/luckyclick_1.1.0-1_all/DEBIAN
-mkdir -p build/luckyclick_1.1.0-1_all/usr/bin
-mkdir -p build/luckyclick_1.1.0-1_all/usr/share/luckyclick
-mkdir -p build/luckyclick_1.1.0-1_all/usr/share/applications
-mkdir -p build/luckyclick_1.1.0-1_all/usr/share/icons/hicolor/{16x16,32x32,48x48,64x64,128x128,256x256}/apps
+mkdir -p build/luckyclick_1.1.2-0_all/DEBIAN
+mkdir -p build/luckyclick_1.1.2-0_all/usr/bin
+mkdir -p build/luckyclick_1.1.2-0_all/usr/share/luckyclick
+mkdir -p build/luckyclick_1.1.2-0_all/usr/share/applications
+mkdir -p build/luckyclick_1.1.2-0_all/usr/share/icons/hicolor/{16x16,32x32,48x48,64x64,128x128,256x256}/apps
 
 # 2. Copy application files / Sao chép file ứng dụng
-cp -r luckyclick build/luckyclick_1.1.0-1_all/usr/share/luckyclick/
-cp luckyclick.desktop build/luckyclick_1.1.0-1_all/usr/share/applications/
-cp debian/control build/luckyclick_1.1.0-1_all/DEBIAN/
-cp debian/postinst build/luckyclick_1.1.0-1_all/DEBIAN/
-cp debian/postrm build/luckyclick_1.1.0-1_all/DEBIAN/
+cp -r luckyclick build/luckyclick_1.1.2-0_all/usr/share/luckyclick/
+cp luckyclick.desktop build/luckyclick_1.1.2-0_all/usr/share/applications/
+cp debian/control build/luckyclick_1.1.2-0_all/DEBIAN/
+cp debian/postinst build/luckyclick_1.1.2-0_all/DEBIAN/
+cp debian/postrm build/luckyclick_1.1.2-0_all/DEBIAN/
 
 # 3. Generate icons / Tạo icon
 python generate_icons.py
 
 # 4. Build the .deb / Build file .deb
-dpkg-deb --build build/luckyclick_1.1.0-1_all
+dpkg-deb --build build/luckyclick_1.1.2-0_all
 ```
 
 ---
 
 ## 📝 Changelog / Lịch sử thay đổi
 
-### Version 1.1.0 (Latest / Mới nhất)
+### Version 1.1.2 (Latest / Mới nhất)
 
 **New Features / Tính năng mới:**
-- Smart Click mode — per-point click type assignment
+- Smart Click mode — configurable per-action delays and keyboard shortcuts
+- Single-key and key-combination actions in recorded sequences
 - Custom hotkey capture — assign any key as start/stop hotkey
 - Click at cursor position (normal mode without recorded points)
 - Unlimited click count option

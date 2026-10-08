@@ -1,3 +1,19 @@
+luckyclick (1.1.2-0) unstable; urgency=medium
+
+  * Improve recorded-action list sizing and scrolling
+  * Align per-action delay inputs with their list rows
+  * Reduce click-type and hotkey selector widths and compact the title area
+
+ -- LuckyClick Team <support@luckyclick.dev>  Thu, 08 Oct 2026 09:00:00 +0000
+
+luckyclick (1.1.1-0) unstable; urgency=medium
+
+  * Add configurable per-action smart delays for click and keyboard actions
+  * Add single-key and key-combination actions to Smart Click sequences
+  * Preserve action delays and keyboard actions in saved profiles
+
+ -- LuckyClick Team <support@luckyclick.dev>  Thu, 08 Oct 2026 07:00:00 +0000
+
 luckyclick (1.1.0-2) unstable; urgency=medium
 
   * Fix: Automatically enable Smart Click for recorded and loaded points

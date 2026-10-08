@@ -6,7 +6,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='luckyclick',
-    version='1.1.0',
+    version='1.1.2',
     description='LuckyClick - Auto Clicker for Linux',
     long_description='A feature-rich auto clicker for Linux with virtual mouse support, '
                      'point recording, and system tray integration.',
