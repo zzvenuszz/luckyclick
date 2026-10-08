@@ -1,0 +1,49 @@
+luckyclick (1.1.2-0) unstable; urgency=medium
+
+  * Improve recorded-action list sizing and scrolling
+  * Align per-action delay inputs with their list rows
+  * Reduce click-type and hotkey selector widths and compact the title area
+
+ -- LuckyClick Team <support@luckyclick.dev>  Thu, 08 Oct 2026 09:00:00 +0000
+
+luckyclick (1.1.1-0) unstable; urgency=medium
+
+  * Add configurable per-action smart delays for click and keyboard actions
+  * Add single-key and key-combination actions to Smart Click sequences
+  * Preserve action delays and keyboard actions in saved profiles
+
+ -- LuckyClick Team <support@luckyclick.dev>  Thu, 08 Oct 2026 07:00:00 +0000
+
+luckyclick (1.1.0-2) unstable; urgency=medium
+
+  * Fix: Automatically enable Smart Click for recorded and loaded points
+  * Fix: Wait for the click thread to stop before returning from Stop
+  * Fix: Warp the X11 desktop pointer before clicking recorded positions
+  * Build: Declare debhelper compatibility and Python addon dependencies
+  * Build: Restrict pybuild clean to its temporary build directory
+
+ -- LuckyClick Team <support@luckyclick.dev>  Wed, 07 Oct 2026 00:00:00 +0000
+
+luckyclick (1.1.0-1) unstable; urgency=medium
+
+  * Fix: Smart Click now correctly clicks at recorded positions
+  * Fix: X11 fallback now moves cursor to recorded coordinates before clicking
+  * Fix: pynput fallback now moves cursor to recorded coordinates before clicking
+  * Fix: uinput device struct now properly sets absmax/absmin/absfuzz/absflat
+  * Fix: Coordinate consistency between Smart Click and normal mode on HiDPI
+  * Add: Smart Click mode with per-point click type support
+
+ -- LuckyClick Team <support@luckyclick.dev>  Sun, 05 Jul 2026 12:00:00 +0000
+
+luckyclick (1.0.0-1) unstable; urgency=medium
+
+  * Initial release
+  * Full-featured auto clicker for Linux
+  * Support left, right, middle, double click
+  * Recording mode with drag & drop overlay
+  * Global hotkeys (F4, F8)
+  * Virtual mouse support (uinput)
+  * System tray integration
+  * Bilingual interface (Vietnamese/English)
+
+ -- LuckyClick Team <support@luckyclick.dev>  Mon, 04 Jul 2026 12:00:00 +0000

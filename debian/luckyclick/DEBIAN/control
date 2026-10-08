@@ -1,0 +1,24 @@
+Package: luckyclick
+Version: 1.1.2-0
+Architecture: all
+Maintainer: LuckyClick Team <support@luckyclick.dev>
+Installed-Size: 367
+Depends: python3-pynput, python3-pyqt5, python3-xlib, python3:any, python3-dbus, python3-gi
+Recommends: python3-uinput
+Section: utils
+Priority: optional
+Homepage: https://github.com/luckyclick
+Description: LuckyClick - Auto Clicker for Linux
+ A feature-rich auto clicker for Linux with virtual mouse support,
+ point recording, and system tray integration.
+ Features:
+  * Customizable click interval (hours, minutes, seconds, milliseconds)
+  * Left, right, middle, and double click support
+  * Global hotkeys (F4 for recording, F8 for start/stop)
+  * Drag & drop point recording with real-time coordinates
+  * Non-blocking click using virtual mouse (uinput)
+  * System tray integration with auto-hide
+  * Unlimited or limited click count
+  * Random delay simulation
+  * Save/load profiles
+  * Bilingual interface (Vietnamese/English)

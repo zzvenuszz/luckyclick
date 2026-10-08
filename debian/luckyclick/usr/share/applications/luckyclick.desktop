@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=LuckyClick
+Name[vi]=LuckyClick
+Comment=Auto Clicker for Linux
+Comment[vi]=Phần mềm Auto Click cho Linux
+Exec=/usr/bin/luckyclick
+Icon=luckyclick
+Terminal=false
+Categories=Utility;Accessibility;
+Keywords=click;auto;mouse;automation;
+StartupNotify=true
